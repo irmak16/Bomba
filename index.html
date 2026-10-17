@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2456a8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="Kraliyet Zinciri: tarayıcıda oynanan, Zuma tarzı mücevher atma oyunu.">
+  <title>Kraliyet Zinciri</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="assets/img/ball_purple.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/img/icon-192.png">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="loading" class="screen show"><div class="spinner"></div></div>
+
+  <!-- Ana menü -->
+  <div id="menu" class="screen">
+    <div class="menu-shade"></div>
+    <div class="logo">
+      <svg class="crown" viewBox="0 0 120 80" aria-hidden="true">
+        <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3a8"/><stop offset=".45" stop-color="#ffc93a"/><stop offset="1" stop-color="#d4840f"/></linearGradient></defs>
+        <path d="M10 66 L4 18 L34 42 L60 6 L86 42 L116 18 L110 66 Z" fill="url(#cg)" stroke="#7a3d00" stroke-width="5" stroke-linejoin="round"/>
+        <rect x="10" y="60" width="100" height="14" rx="5" fill="url(#cg)" stroke="#7a3d00" stroke-width="5"/>
+        <circle cx="60" cy="38" r="8" fill="#ff3b52" stroke="#7a3d00" stroke-width="3"/>
+        <circle cx="32" cy="52" r="5" fill="#3d8bff" stroke="#7a3d00" stroke-width="2.5"/>
+        <circle cx="88" cy="52" r="5" fill="#36d65a" stroke="#7a3d00" stroke-width="2.5"/>
+      </svg>
+      <div class="logo-top">KRALİYET</div>
+      <div class="logo-main">ZİNCİRİ</div>
+      <div class="ball-row">
+        <img src="assets/img/ball_red.png" alt=""><img src="assets/img/ball_blue.png" alt=""><img src="assets/img/ball_green.png" alt=""><img src="assets/img/ball_yellow.png" alt=""><img src="assets/img/ball_purple.png" alt=""><img src="assets/img/ball_cyan.png" alt="">
+      </div>
+    </div>
+    <div class="menu-buttons">
+      <button class="btn btn-green btn-xl" data-act="play">OYNA</button>
+      <button class="btn btn-red" data-act="survival" id="survBtn">Sonsuz Mod</button>
+    </div>
+    <div class="menu-corner left">
+      <div class="daily" id="dailyCard"></div>
+    </div>
+    <div class="menu-corner right">
+      <button class="round-btn" data-act="skins" aria-label="Görünümler">🎨</button>
+      <button class="round-btn" data-act="stats" aria-label="İstatistikler">📊</button>
+      <button class="round-btn" data-act="editor" aria-label="Bölüm editörü">🛠️</button>
+      <button class="round-btn" data-act="settings" aria-label="Ayarlar">⚙️</button>
+    </div>
+  </div>
+
+  <!-- Dünya haritası -->
+  <div id="map" class="screen">
+    <div class="map-scroll" id="mapScroll"><div class="map-inner" id="mapInner"></div></div>
+    <div class="map-top">
+      <button class="round-btn" data-act="back" aria-label="Geri">◀</button>
+      <div class="pill"><span class="star-ico"></span><span id="mapStars">0</span></div>
+    </div>
+  </div>
+
+  <!-- Oyun içi üst bar -->
+  <div id="hud" class="hud">
+    <button class="round-btn" data-act="pause" aria-label="Duraklat"><span class="pause-ico"></span></button>
+    <div class="pill level-pill"><span id="hudLevel">1</span></div>
+    <div class="progress">
+      <div class="progress-fill" id="hudProg"></div>
+      <div class="progress-shine"></div>
+      <svg class="progress-crown" viewBox="0 0 120 80" aria-hidden="true"><path d="M10 66 L4 18 L34 42 L60 6 L86 42 L116 18 L110 66 Z" fill="#ffc93a" stroke="#7a3d00" stroke-width="7" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="pill score-pill"><img src="assets/img/ball_yellow.png" alt=""><span id="hudScore">0</span></div>
+  </div>
+
+  <!-- Pencere -->
+  <div id="modal" class="screen modal">
+    <div class="panel" id="modalPanel">
+      <div class="ribbon"><span id="modalTitle">Başlık</span></div>
+      <button class="round-btn close" id="modalClose" aria-label="Kapat">✕</button>
+      <div class="stars" id="modalStars"><div class="star s1"></div><div class="star s2"></div><div class="star s3"></div></div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-buttons" id="modalButtons"></div>
+    </div>
+  </div>
+
+  <!-- Hikâye -->
+  <div id="story" class="story">
+    <div class="story-box">
+      <div class="story-portrait" id="storyPortrait">
+        <img id="storyImg" src="assets/img/mascot.png" alt="">
+        <svg id="storyFallback" viewBox="0 0 120 80" aria-hidden="true"><path d="M10 66 L4 18 L34 42 L60 6 L86 42 L116 18 L110 66 Z" fill="#ffc93a" stroke="#7a3d00" stroke-width="6" stroke-linejoin="round"/><circle cx="60" cy="40" r="8" fill="#ff3b52" stroke="#7a3d00" stroke-width="3"/></svg>
+      </div>
+      <div class="story-name">Bilge Baykuş</div>
+      <div class="story-text" id="storyText"></div>
+      <button class="btn btn-green btn-sm" id="storyNext">Devam</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <div id="wipe" class="wipe"></div>
+
+  <script src="js/levels.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/path.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Bölüm Editörü · Kraliyet Zinciri</title>
+  <link rel="icon" href="assets/img/ball_purple.png">
+  <style>
+    @font-face { font-family: 'Baloo 2'; font-weight: 800; src: url(assets/fonts/baloo-2-latin-ext-800-normal.woff2) format('woff2'); unicode-range: U+0100-02BA; }
+    @font-face { font-family: 'Baloo 2'; font-weight: 800; src: url(assets/fonts/baloo-2-latin-800-normal.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+2000-206F; }
+    :root { --bg: #14306a; --panel: #1f4fa3; --gold: #ffc93a; --brown: #6a3300; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 800; overflow: hidden; }
+    .bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px; background: linear-gradient(#2f6fd0, #1f4fa3); border-bottom: 3px solid var(--gold); }
+    .bar .grp { display: flex; gap: 4px; align-items: center; padding: 3px 6px; background: rgba(0,0,0,.18); border-radius: 10px; }
+    .bar label { font-size: 13px; opacity: .9; }
+    button, select, input { font-family: inherit; font-weight: 800; font-size: 14px; }
+    button { cursor: pointer; color: #fff; border: 2px solid #173f86; border-radius: 9px; padding: 5px 10px; background: linear-gradient(#6fb4ff, #2f78e0); box-shadow: 0 2px 0 #173f86; }
+    button:active { transform: translateY(1px); }
+    button.on { background: linear-gradient(#ffe98a, #ffb51e); color: #5a2a00; border-color: var(--brown); box-shadow: 0 2px 0 var(--brown); }
+    button.green { background: linear-gradient(#9be852, #46b324); border-color: #1f6e10; box-shadow: 0 2px 0 #1f6e10; }
+    button.red { background: linear-gradient(#ff8a7a, #e43a3a); border-color: #85151f; box-shadow: 0 2px 0 #85151f; }
+    select, input { border-radius: 8px; border: 2px solid #173f86; padding: 3px 6px; background: #fff; color: #222; }
+    input[type=number] { width: 58px; }
+    input[type=text] { width: 130px; }
+    #wrap { position: absolute; left: 0; right: 0; bottom: 0; }
+    canvas { display: block; touch-action: none; }
+    #info { position: absolute; left: 8px; bottom: 8px; padding: 6px 10px; border-radius: 10px; background: rgba(10,25,60,.75); font-size: 13px; pointer-events: none; line-height: 1.35; }
+    #info .warn { color: #ff8a7a; }
+    #help { position: absolute; right: 8px; bottom: 8px; max-width: 330px; padding: 8px 10px; border-radius: 10px; background: rgba(10,25,60,.75); font-size: 12px; line-height: 1.35; }
+    #help b { color: var(--gold); }
+    #toast { position: fixed; left: 50%; top: 70px; transform: translateX(-50%); background: #2f8f22; border: 2px solid var(--gold); padding: 6px 14px; border-radius: 999px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+    #toast.show { opacity: 1; }
+    dialog { border: 3px solid var(--gold); border-radius: 14px; background: var(--panel); color: #fff; width: min(92vw, 640px); }
+    dialog textarea { width: 100%; height: 50vh; font-family: monospace; font-size: 12px; }
+    @media (max-width: 760px), (max-height: 520px) { #help { display: none; } .bar { gap: 4px; padding: 5px; } button, select, input { font-size: 12px; } .bar label { font-size: 11px; } }
+  </style>
+</head>
+<body>
+  <div class="bar" id="bar">
+    <a href="index.html"><button>◀ Oyun</button></a>
+    <div class="grp">
+      <button data-tool="path" class="on" title="Tıkla: nokta ekle · Sürükle: taşı">✏️ Yol</button>
+      <button data-tool="insert" title="Yolun üstüne tıkla: araya nokta ekle">➕ Araya</button>
+      <button data-tool="shooter">🎯 Atıcı</button>
+      <button data-tool="pillar">🗿 Sütun</button>
+      <button data-tool="tunnel" title="Sürükleyerek köprü kutusu çiz">🌉 Köprü</button>
+      <button data-tool="erase">🧽 Sil</button>
+    </div>
+    <div class="grp">
+      <label>Yol</label>
+      <button data-path="0" class="on">1</button><button data-path="1">2</button>
+      <button id="delPath" class="red" title="Seçili yolu sil">✕</button>
+    </div>
+    <div class="grp">
+      <label>Ad</label><input type="text" id="fName">
+      <label>Zemin</label><select id="fBg"></select>
+      <label>Renk</label><input type="number" id="fColors" min="3" max="6">
+      <label>Top</label><input type="number" id="fCount" min="5" max="300">
+      <label>Hız</label><input type="number" id="fSpeed" min="10" max="90">
+      <label>Güç %</label><input type="number" id="fPw" min="0" max="30">
+    </div>
+    <div class="grp">
+      <select id="fLoad"><option value="">Bölüm yükle…</option></select>
+      <button id="undo">↶ Geri</button>
+      <button id="clear" class="red">Temizle</button>
+      <button id="json">{ } JSON</button>
+      <button id="test" class="green">▶ Test Et</button>
+    </div>
+  </div>
+  <div id="wrap"><canvas id="cv"></canvas><div id="info"></div>
+    <div id="help"><b>✏️ Yol:</b> boş yere tıkla → nokta ekle, noktayı sürükle → taşı. İlk nokta (yeşil) kapı, son nokta (kırmızı) sandık.<br>
+      <b>🧽 Sil:</b> nokta/sütun/köprüye tıkla. Sağ tık her araçta siler.<br>
+      Soluk toplar zincirin yerleşimini gösterir; kırmızı işaretler çakışmadır.</div>
+  </div>
+  <div id="toast"></div>
+  <dialog id="dlg">
+    <p>Bölüm JSON'u. Kopyalayıp <code>js/levels.js</code> içindeki <code>LEVELS</code> listesine ekleyebilir ya da başka JSON yapıştırıp yükleyebilirsin.</p>
+    <textarea id="jsonText"></textarea>
+    <p><button id="jsonCopy">Kopyala</button> <button id="jsonLoad" class="green">Yapıştırılanı Yükle</button> <button id="jsonClose" class="red">Kapat</button></p>
+  </dialog>
+  <script src="js/levels.js"></script>
+  <script src="js/path.js"></script>
+  <script src="js/editor.js"></script>
+</body>
+</html>
