@@ -17,6 +17,10 @@
       }
     }
     dense.push(pts[pts.length - 1]);
+    // her kontrol noktasının yol üzerindeki uzunluğu (portal vb. için)
+    const cum = [0];
+    for (let i = 1; i < dense.length; i++) cum.push(cum[i - 1] + Math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]));
+    const ctrlS = pts.map((_, j) => cum[Math.min(dense.length - 1, j * 40)]);
     const STEP = 2;
     const xs = [dense[0][0]], ys = [dense[0][1]];
     let acc = 0;
@@ -36,7 +40,7 @@
     if (xs.length < 3) { xs.push(xs[0] + 1, xs[0] + 2); ys.push(ys[0], ys[0]); }
     const n = xs.length;
     return {
-      xs, ys, step: STEP, len: (n - 1) * STEP,
+      xs, ys, step: STEP, len: (n - 1) * STEP, ctrlS: ctrlS.map(v => Math.min(v, (n - 1) * STEP)),
       pos(s, out) {
         out = out || {};
         let f = s / STEP; if (f < 0) f = 0; if (f > n - 1) f = n - 1;
@@ -76,7 +80,14 @@
     opts = opts || {};
     const k = (opts.D || 46) / 46;
     const night = !!opts.night;
-    const tp = strokeRange(c, p, 0, p.len);
+    // gizli aralıklar (portal) dışındaki parçaları tek Path2D'de topla
+    const hid = (opts.hidden || []).slice().sort((a, b) => a[0] - b[0]);
+    const vis = []; let from = 0;
+    hid.forEach(h => { if (h[0] > from) vis.push([from, h[0]]); from = Math.max(from, h[1]); });
+    if (from < p.len) vis.push([from, p.len]);
+    const tp = new Path2D();
+    vis.forEach(v => tp.addPath(strokeRange(c, p, v[0], v[1])));
+    const inHidden = s => hid.some(h => s > h[0] && s < h[1]);
     c.lineCap = 'round'; c.lineJoin = 'round';
     c.save();
     c.shadowColor = 'rgba(20,40,10,0.45)'; c.shadowBlur = 14; c.shadowOffsetY = 6;
@@ -92,6 +103,7 @@
     c.strokeStyle = 'rgba(140,100,50,0.28)'; c.lineWidth = 2;
     const tmp = {};
     for (let s = 12; s < p.len - 10; s += 26) {
+      if (inHidden(s)) continue;
       p.pos(s, tmp);
       const a = p.angle(s) + Math.PI / 2, ca = Math.cos(a) * 23 * k, sa = Math.sin(a) * 23 * k;
       c.beginPath(); c.moveTo(tmp.x - ca, tmp.y - sa); c.lineTo(tmp.x + ca, tmp.y + sa); c.stroke();

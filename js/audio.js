@@ -72,52 +72,77 @@
   S.win = () => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.4, 'triangle', 0.2, i * 0.11)); };
   S.lose = () => { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.45, 'sawtooth', 0.08, i * 0.18)); };
   S.star = (i) => tone(PENTA[3 + i * 2], 0.3, 'triangle', 0.2);
+  S.ice = () => { noise(0.18, 0.18, 0, 4000); [2400, 3100, 2800].forEach((f, i) => tone(f, 0.08, 'triangle', 0.07, i * 0.03)); };
+  S.paint = () => { [0, 1, 2, 4, 6].forEach((k, i) => tone(PENTA[k + 2], 0.2, 'sine', 0.1, i * 0.035)); noise(0.3, 0.05, 0, 2000); };
+  S.bossHit = () => { tone(130, 0.18, 'square', 0.1, 0, 70); noise(0.1, 0.12, 0, 600); };
+  S.pull = () => { tone(300, 0.5, 'sawtooth', 0.07, 0, 120); tone(200, 0.5, 'sawtooth', 0.05, 0.1, 90); };
+  S.lastChance = () => { tone(200, 0.6, 'sine', 0.25, 0, 900); [0, 4, 7].forEach((k, i) => tone(PENTA[k + 3], 0.4, 'triangle', 0.15, 0.25 + i * 0.07)); };
+  S.thunder = () => { if (!S.enabled || !ensure()) return; noise(1.4, 0.18, 0, 40); tone(55, 1.2, 'sine', 0.2, 0, 35); };
   S.vibrate = (ms) => { if (S.vib && navigator.vibrate) { try { navigator.vibrate(ms); } catch (_) { } } };
 
-  // ---------- müzik: C - Am - F - G döngüsü, yumuşak masal havası ----------
-  const BPM = 92, BEAT = 60 / BPM;
+  // ---------- müzik: dünya başına tema (kodla üretilir) ----------
   const N = n => 440 * Math.pow(2, (n - 69) / 12);
-  const CHORDS = [[48, 55, 60, 64, 67], [45, 52, 57, 60, 64], [41, 48, 53, 57, 60], [43, 50, 55, 59, 62]];
-  const MELODY = [
-    [76, 74, 72, 74, 76, 76, 76, -1], [72, 69, 72, 76, 74, 72, 69, -1],
-    [72, 74, 76, 77, 76, 74, 72, -1], [74, 76, 74, 71, 67, 71, 74, -1],
-    [76, 79, 76, 74, 72, 74, 76, -1], [72, 76, 81, 79, 76, 72, 69, -1],
-    [77, 76, 74, 72, 69, 72, 74, -1], [74, 71, 67, 71, 74, 72, 71, -1]
+  // tema: tempo, akorlar (kök + üçlü), melodi ölçeği, karakter
+  const THEMES = [
+    { bpm: 92, root: 48, prog: [[0, 4, 7], [-3, 0, 4], [-7, -3, 0], [-5, -1, 2]], scale: [0, 2, 4, 7, 9], wave: 'sine', bell: 0.06 },          // C majör, neşeli
+    { bpm: 84, root: 53, prog: [[0, 4, 7], [2, 5, 9], [-5, -1, 2], [0, 4, 7]], scale: [0, 2, 4, 5, 7, 9], wave: 'triangle', bell: 0.05 },     // F majör, sıcak
+    { bpm: 76, root: 45, prog: [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -1, 2]], scale: [0, 2, 3, 7, 8], wave: 'sine', bell: 0.055 },          // La minör, gizemli
+    { bpm: 88, root: 50, prog: [[0, 3, 7], [5, 9, 12], [-2, 2, 5], [0, 3, 7]], scale: [0, 2, 3, 5, 7, 9], wave: 'triangle', bell: 0.05 },      // Re dorian, sonbahar
+    { bpm: 70, root: 52, prog: [[0, 3, 7], [-4, 0, 3], [-7, -4, 0], [-5, -2, 2]], scale: [0, 3, 7, 10, 12], wave: 'sine', bell: 0.07 },        // Mi minör, kış çanları
+    { bpm: 104, root: 43, prog: [[0, 3, 7], [-2, 2, 5], [-4, 0, 3], [-5, -1, 2]], scale: [0, 2, 3, 5, 7], wave: 'sawtooth', bell: 0.04 },      // Sol minör, fırtına
   ];
-  let musicTimer = null, nextBar = 0, barIdx = 0, musicStarted = false;
+  THEMES.boss = { bpm: 116, root: 45, prog: [[0, 3, 7], [1, 4, 8], [0, 3, 7], [-1, 3, 6]], scale: [0, 1, 3, 5, 7], wave: 'square', bell: 0.035, drums: true };
+  let theme = THEMES[0], themeKey = 0;
+  let musicTimer = null, nextBar = 0, barIdx = 0, musicStarted = false, seed = 1;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  let melodyCache = {};
+  function melodyFor(bar) {
+    const key = themeKey + ':' + (bar % 8);
+    if (melodyCache[key]) return melodyCache[key];
+    seed = 1000 + (bar % 8) * 97 + (typeof themeKey === 'number' ? themeKey * 13 : 77);
+    const ch = theme.prog[bar % 4], notes = [];
+    let last = 2;
+    for (let i = 0; i < 8; i++) {
+      if (i === 7 || rand() < 0.15) { notes.push(-1); continue; }
+      // vuruşlarda akor notası, aralarda ölçek notası
+      if (i % 2 === 0) notes.push(theme.root + 24 + ch[(rand() * 3) | 0]);
+      else { last = Math.max(0, Math.min(theme.scale.length - 1, last + ((rand() * 3) | 0) - 1)); notes.push(theme.root + 24 + theme.scale[last]); }
+    }
+    return (melodyCache[key] = notes);
+  }
   function scheduleBar(t, bar) {
-    const ch = CHORDS[bar % 4], mel = MELODY[bar % 8];
-    // pad
-    ch.slice(1).forEach(n => {
+    const BEAT = 60 / theme.bpm;
+    const ch = theme.prog[bar % 4], mel = melodyFor(bar);
+    ch.forEach(iv => {
       const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'triangle'; o.frequency.value = N(n);
-      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.035, t + 0.3); g.gain.linearRampToValueAtTime(0.0001, t + BEAT * 4);
+      o.type = 'triangle'; o.frequency.value = N(theme.root + 12 + iv);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.03, t + 0.3); g.gain.linearRampToValueAtTime(0.0001, t + BEAT * 4);
       o.connect(g); g.connect(musicGain); o.start(t); o.stop(t + BEAT * 4 + 0.05);
     });
-    // bas
-    [0, 2].forEach(b => {
+    const bassBeats = theme.drums ? [0, 1, 2, 3] : [0, 2];
+    bassBeats.forEach(b => {
       const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'sine'; o.frequency.value = N(ch[0] - 12);
+      o.type = 'sine'; o.frequency.value = N(theme.root + ch[0] - 12);
       const tt = t + b * BEAT;
-      g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.16, tt + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, tt + BEAT * 1.8);
+      g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.16, tt + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, tt + BEAT * 1.6);
       o.connect(g); g.connect(musicGain); o.start(tt); o.stop(tt + BEAT * 2);
     });
-    // melodi (8'lik notalar, çan sesi)
     mel.forEach((n, i) => {
       if (n < 0) return;
       const tt = t + i * BEAT / 2;
       [1, 2.01].forEach((m, j) => {
         const o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = 'sine'; o.frequency.value = N(n) * m;
-        g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(j ? 0.018 : 0.06, tt + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, tt + BEAT * 0.9);
+        o.type = j ? 'sine' : theme.wave; o.frequency.value = N(n) * m;
+        const v = j ? theme.bell * 0.3 : theme.bell * (theme.wave === 'sine' ? 1 : 0.45);
+        g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(v, tt + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, tt + BEAT * 0.9);
         o.connect(g); g.connect(musicGain); o.start(tt); o.stop(tt + BEAT);
       });
     });
-    // hafif tıkırtı
-    for (let i = 0; i < 4; i++) noise(0.03, 0.025, (t - ctx.currentTime) + i * BEAT + BEAT / 2, 6000, musicGain);
+    for (let i = 0; i < 4; i++) noise(0.03, theme.drums ? 0.05 : 0.025, (t - ctx.currentTime) + i * BEAT + BEAT / 2, 6000, musicGain);
+    if (theme.drums) for (let i = 0; i < 4; i += 2) { const o = ctx.createOscillator(), g = ctx.createGain(); const tt = t + i * BEAT; o.frequency.setValueAtTime(140, tt); o.frequency.exponentialRampToValueAtTime(45, tt + 0.15); g.gain.setValueAtTime(0.25, tt); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.2); o.connect(g); g.connect(musicGain); o.start(tt); o.stop(tt + 0.22); }
   }
   function tick() {
-    while (nextBar < ctx.currentTime + 1.5) { scheduleBar(nextBar, barIdx++); nextBar += BEAT * 4; }
+    while (nextBar < ctx.currentTime + 1.5) { scheduleBar(nextBar, barIdx++); nextBar += 60 / theme.bpm * 4; }
   }
   function startMusic() {
     if (!ensure() || musicStarted) { setMusicVol(); return; }
@@ -131,6 +156,12 @@
     musicGain.gain.cancelScheduledValues(ctx.currentTime);
     musicGain.gain.setTargetAtTime(S.musicOn ? 0.55 : 0, ctx.currentTime, 0.3);
   }
+  S.setTheme = (k) => {
+    const t = THEMES[k] || THEMES[0];
+    if (t === theme) return;
+    theme = t; themeKey = k; barIdx = 0;
+    if (ctx && musicStarted) nextBar = Math.max(nextBar, ctx.currentTime + 0.05);
+  };
   S.setMusic = (on) => { S.musicOn = on; if (on) startMusic(); else setMusicVol(); };
   document.addEventListener('visibilitychange', () => {
     if (!ctx) return;

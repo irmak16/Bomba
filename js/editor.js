@@ -7,12 +7,12 @@
   const KEY = 'kz_editor';
 
   const IMG = {};
-  ['bg1', 'bg2', 'bg3', 'bg4', 'bg5', 'bg6', 'cannon', 'chest', 'pillar'].forEach(k => {
+  Object.keys(BGS).concat(['cannon', 'chest', 'pillar']).forEach(k => {
     IMG[k] = new Image();
-    IMG[k].src = 'assets/img/' + k + (k.startsWith('bg') ? '.jpg' : '.png');
+    IMG[k].src = 'assets/img/' + k + '.webp';
     IMG[k].onload = () => { layerDirty = true; draw(); };
   });
-  IMG.ball = new Image(); IMG.ball.src = 'assets/img/ball_blue.png';
+  IMG.ball = new Image(); IMG.ball.src = 'assets/img/ball_blue.webp';
 
   const blank = () => ({ name: 'Yeni Bölüm', bg: 'bg1', paths: [[]], shooter: [800, 482], colors: 4, count: 50, speed: 30, pw: 0.06, obstacles: [], tunnels: [] });
   let L = null;
@@ -24,15 +24,17 @@
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(L)); } catch (_) { } };
 
   // ---- form ----
-  ['bg1', 'bg2', 'bg3', 'bg4', 'bg5', 'bg6'].forEach((b, i) => {
+  Object.keys(BGS).forEach((b, i) => {
     const o = document.createElement('option'); o.value = b;
-    o.textContent = ['Bahçe', 'Tarhlı bahçe', 'Gün batımı', 'Gün batımı tarhlı', 'Gece', 'Gece tarhlı'][i];
+    o.textContent = ['Bahçe', 'Tarhlı bahçe', 'Gün batımı', 'Gün batımı tarhlı', 'Gece', 'Gece tarhlı', 'Sonbahar', 'Sonbahar tarhlı', 'Kış', 'Kış tarhlı', 'Fırtına', 'Fırtına tarhlı'][i] || b;
     $('fBg').appendChild(o);
   });
   LEVELS.forEach((lv, i) => { const o = document.createElement('option'); o.value = i; o.textContent = (i + 1) + '. ' + lv.name; $('fLoad').appendChild(o); });
   function syncForm() {
     $('fName').value = L.name; $('fBg').value = L.bg; $('fColors').value = L.colors;
-    $('fCount').value = L.count; $('fSpeed').value = L.speed; $('fPw').value = Math.round((L.pw || 0) * 100);
+    $('fCount').value = L.count || 50; $('fSpeed').value = L.speed; $('fPw').value = Math.round((L.pw || 0) * 100);
+    const sp = L.special || {}; $('fIce').value = Math.round((sp.ice || 0) * 100); $('fJoker').value = Math.round((sp.joker || 0) * 100); $('fGold').value = Math.round((sp.gold || 0) * 100);
+    const g = L.goal || { type: 'clear' }; $('fGoal').value = g.type; $('fGoalN').value = g.n || g.t || g.hp || ''; $('fGoalN').style.display = g.type === 'clear' ? 'none' : '';
     document.querySelectorAll('[data-path]').forEach(b => b.classList.toggle('on', +b.dataset.path === active));
   }
   const clampN = (v, a, b, d) => { v = +v; return isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
@@ -42,11 +44,22 @@
   $('fCount').onchange = e => { L.count = clampN(e.target.value, 5, 300, 50); syncForm(); save(); };
   $('fSpeed').onchange = e => { L.speed = clampN(e.target.value, 10, 90, 30); syncForm(); save(); };
   $('fPw').onchange = e => { L.pw = clampN(e.target.value, 0, 30, 6) / 100; syncForm(); save(); };
+  const setSp = (k, v) => { L.special = L.special || {}; L.special[k] = clampN(v, 0, 30, 0) / 100; save(); };
+  $('fIce').onchange = e => setSp('ice', e.target.value);
+  $('fJoker').onchange = e => setSp('joker', e.target.value);
+  $('fGold').onchange = e => setSp('gold', e.target.value);
+  const setGoal = () => {
+    const t = $('fGoal').value, v = clampN($('fGoalN').value, 1, 999, t === 'gold' ? 10 : t === 'survive' ? 60 : 100);
+    L.goal = t === 'clear' ? { type: 'clear' } : t === 'gold' ? { type: 'gold', n: v } : t === 'survive' ? { type: 'survive', t: v } : { type: 'boss', hp: v };
+    if (t === 'gold' && !(L.special && L.special.gold)) { L.special = L.special || {}; L.special.gold = 0.09; }
+    syncForm(); save();
+  };
+  $('fGoal').onchange = setGoal; $('fGoalN').onchange = setGoal;
   $('fLoad').onchange = e => {
     if (e.target.value === '') return;
     snap(); const src = LEVELS[+e.target.value];
     L = JSON.parse(JSON.stringify(Object.assign(blank(), src)));
-    L.obstacles = L.obstacles || []; L.tunnels = L.tunnels || [];
+    L.obstacles = (L.obstacles || []).map(o => Array.isArray(o) ? o : [o.x, o.y]); L.tunnels = L.tunnels || [];
     active = 0; e.target.value = ''; layerDirty = true; syncForm(); save(); draw();
   };
   document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => {
@@ -90,7 +103,8 @@
     return {
       name: L.name, bg: L.bg,
       paths: L.paths.filter(p => p.length >= 2).map(p => p.map(q => [r(q[0]), r(q[1])])),
-      shooter: [r(L.shooter[0]), r(L.shooter[1])], colors: L.colors, count: L.count, speed: L.speed, pw: L.pw,
+      shooter: [r(L.shooter[0]), r(L.shooter[1])], colors: L.colors, count: L.count || 50, speed: L.speed, pw: L.pw,
+      special: L.special || {}, goal: L.goal || { type: 'clear' }, portals: L.portals || [],
       obstacles: L.obstacles.map(o => [r(o[0]), r(o[1])]), tunnels: L.tunnels.map(t => t.map(r))
     };
   }
@@ -115,7 +129,7 @@
     layer = document.createElement('canvas'); layer.width = W; layer.height = H;
     const c = layer.getContext('2d');
     if (IMG[L.bg].complete) c.drawImage(IMG[L.bg], 0, 0, W, H);
-    paths.forEach(p => p && KZPath.drawTrack(c, p, { night: L.bg === 'bg5' || L.bg === 'bg6' }));
+    paths.forEach((p, pi) => p && KZPath.drawTrack(c, p, { night: !!(BGS[L.bg] || {}).night, hidden: (L.portals || []).filter(q => q[0] === pi && L.paths[pi][q[2]]).map(q => [p.ctrlS[q[1]], p.ctrlS[q[2]]]) }));
     paths.forEach(p => p && L.tunnels.forEach(b => p.rangesInBox(b).forEach(rg => KZPath.drawBridge(c, p, rg[0], rg[1]))));
     layerDirty = false;
   }
